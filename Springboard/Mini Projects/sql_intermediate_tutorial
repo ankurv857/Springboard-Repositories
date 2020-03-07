@@ -1,0 +1,208 @@
+--HAVING
+--"clean" way to filter a query that has been aggregated
+
+-- Correct ordering of everything so far
+--SELECT
+--FROM
+--WHERE
+--GROUP BY
+--HAVING
+--ORDER BY
+
+SELECT year,
+       month,
+       MAX(high) AS month_high
+  FROM tutorial.aapl_historical_stock_price
+ GROUP BY year, month
+HAVING MAX(high) > 400
+ ORDER BY year, month
+ 
+ 
+ 
+ --DISTINCT
+ --use to look at only the unique values in a particular column.
+ 
+ --returns all unique values in month column (numbers 1-12)
+ SELECT DISTINCT month
+  FROM tutorial.aapl_historical_stock_price
+  
+  --returns unique values in year column, in chronological order
+  SELECT DISTINCT year
+  FROM tutorial.aapl_historical_stock_price 
+  ORDER BY year
+  
+  --often used with other aggregate functions.  This one counts the unique values in the month column
+  SELECT COUNT(DISTINCT month) AS unique_months
+  FROM tutorial.aapl_historical_stock_price
+  
+  --counts the number of unique values in the month column for each year.
+  SELECT 
+  year,
+  COUNT(DISTINCT month) as months_count
+  FROM tutorial.aapl_historical_stock_price 
+  GROUP BY year
+  ORDER BY year
+  
+  --CASE
+  --The CASE statement is SQL’s way of handling if/then logic. The CASE statement is followed by at least 
+  --one pair of WHEN and THEN statements—SQL’s equivalent of IF/THEN in Excel. 
+  --Every CASE statement must end with the END statement.
+  
+--The CASE statement checks each row to see if the conditional statement—year = 'SR' is true.
+--For any given row, if that conditional statement is true, the word “yes” gets printed in the column that we have named is_a_senior.
+--In any row for which the conditional statement is false, nothing happens in that row, leaving a null value in the is_a_senior column.
+--At the same time all this is happening, SQL is retrieving and displaying all the values in the player_name and year columns.
+ SELECT player_name,
+       year,
+       CASE WHEN year = 'SR' THEN 'yes'
+            ELSE NULL END AS is_a_senior
+  FROM benn.college_football_players
+  
+--includes a column that is flagged "yes" when a player is from California, and sort the results with those players first.
+SELECT player_name,
+  state,
+  CASE WHEN state = 'CA' THEN 'yes'
+       ELSE NULL END AS is_from_ca
+FROM benn.college_football_players 
+ORDER BY is_from_CA
+
+--separates players into height groups
+SELECT player_name,
+  height,
+  CASE WHEN height < 65 THEN '1' 
+        WHEN height < 68 THEN '2'
+        WHEN height < 72 THEN '3'
+        ELSE '4' END AS height_group
+FROM benn.college_football_players 
+
+--A quick review of CASE basics:
+--The CASE statement always goes in the SELECT clause
+--CASE must include the following components: WHEN, THEN, and END. ELSE is an optional component.
+--You can make any conditional statement using any conditional operator (like WHERE) between WHEN and THEN. This includes stringing together multiple conditional statements using AND and OR.
+--You can include multiple WHEN statements, as well as an ELSE statement to deal with any unaddressed conditions.
+
+--More complicated -- pairing with aggregate functions
+--count number of players in each year
+SELECT CASE WHEN year = 'FR' THEN 'FR'
+            WHEN year = 'SO' THEN 'SO'
+            WHEN year = 'JR' THEN 'JR'
+            WHEN year = 'SR' THEN 'SR'
+            ELSE 'No Year Data' END AS year_group,
+            COUNT(1) AS count
+  FROM benn.college_football_players
+ GROUP BY 1
+ 
+ --counts the number of 300lb+ players for each of the following regions: West Coast (CA, OR, WA), Texas, and Other (Everywhere else).
+ SELECT 
+  CASE WHEN state IN ('CA','OR','WA') THEN 'West Coast'
+       WHEN state = 'TX' THEN 'Texas'
+       ELSE 'Other' END AS region,
+       COUNT(1) AS players
+FROM benn.college_football_players 
+WHERE weight >= 300
+GROUP BY 1
+
+--calculates the combined weight of all underclass players (FR/SO) in California as well as the combined weight of all upperclass players (JR/SR) in California.
+SELECT CASE WHEN year = 'FR' OR year = 'SO' THEN 'underclassmen'
+            WHEN year = 'JR' OR year = 'SR' THEN 'upperclassmen'
+            ELSE NULL END AS class,
+            SUM(weight) as total_weight
+FROM benn.college_football_players 
+WHERE state = 'CA'
+GROUP BY 1
+
+--displays the number of players in each state, with FR, SO, JR, and SR players in separate columns and another column for the total number 
+--of players. Order results such that states with the most players come first.
+SELECT state,
+       COUNT(CASE WHEN year = 'FR' THEN 1 ELSE NULL END) AS fr_count,
+       COUNT(CASE WHEN year = 'SO' THEN 1 ELSE NULL END) AS so_count,
+       COUNT(CASE WHEN year = 'JR' THEN 1 ELSE NULL END) AS jr_count,
+       COUNT(CASE WHEN year = 'SR' THEN 1 ELSE NULL END) AS sr_count,
+       COUNT(1) AS total_players
+  FROM benn.college_football_players
+  GROUP BY state
+  ORDER BY total_players DESC
+  
+--  shows the number of players at schools with names that start with A through M, and the number at schools with names starting with N - Z.
+  SELECT 
+  COUNT(CASE WHEN school_name < 'n' THEN 1 ELSE NULL END) as a_m_count,
+  COUNT(CASE WHEN school_name >= 'n' THEN 1 ELSE NULL END) as n_z_count
+FROM benn.college_football_players 
+
+
+--JOIN
+--joins two tables 
+SELECT *
+  FROM benn.college_football_players players
+  JOIN benn.college_football_teams teams
+    ON teams.school_name = players.school_name
+    
+-- INNER JOIN
+-- mathematical intersection of two tables
+--displays player names, school names and conferences for schools in the "FBS (Division I-A Teams)" division.
+SELECT players.player_name,
+       players.school_name,
+       teams.conference
+  FROM benn.college_football_players players
+  JOIN benn.college_football_teams teams
+    ON teams.school_name = players.school_name
+    WHERE teams.division = 'FBS (Division I-A Teams)'
+    
+--LEFT JOIN returns only unmatched rows from the left table.
+--RIGHT JOIN returns only unmatched rows from the right table.
+--FULL OUTER JOIN returns unmatched rows from both tables.
+
+--Count the number of unique companies (don't double-count companies) and unique acquired companies by state. Do not include results 
+--for which there is no state data, and order by the number of acquired companies from highest to lowest.
+SELECT companies.state_code, 
+       COUNT(DISTINCT companies.permalink) AS companies_count,
+       COUNT(DISTINCT acquisitions.company_permalink) AS aquired_count
+  FROM tutorial.crunchbase_companies companies
+  LEFT JOIN tutorial.crunchbase_acquisitions acquisitions
+    ON companies.permalink = acquisitions.company_permalink
+    WHERE companies.state_code IS NOT NULL
+    GROUP BY companies.state_code
+    ORDER BY aquired_count DESC
+
+--shows a company's name, "status" (found in the Companies table), and the number of unique investors in that company. Order by the numbe
+--of investors from most to fewest. Limit to only companies in the state of New York.
+SELECT companies.name,
+       companies.status,
+       COUNT(DISTINCT investments.investor_name)
+FROM tutorial.crunchbase_companies companies
+LEFT JOIN tutorial.crunchbase_investments investments
+ON companies.permalink = investments.company_permalink
+WHERE companies.state_code = 'NY'
+GROUP BY 1,2
+ORDER BY 3 DESC
+
+--lists investors based on the number of companies in which they are invested. Include a row for companies with no investor, and order from most companies to least.
+SELECT CASE WHEN investments.investor_name IS NULL THEN 'No Investors'
+            ELSE investments.investor_name END AS investor,
+       COUNT(DISTINCT companies.permalink) as companies_invested_in
+FROM tutorial.crunchbase_companies companies
+LEFT JOIN tutorial.crunchbase_investments investments
+ON companies.permalink = investments.company_permalink
+GROUP BY 1
+ORDER BY 2 DESC
+
+
+--UNION
+--allows you to stack one dataset on top of another.
+
+SELECT company_permalink,
+       company_name,
+       investor_name
+  FROM tutorial.crunchbase_investments_part1 
+  WHERE company_name ILIKE 't%'
+
+ UNION
+
+ SELECT company_permalink,
+        company_name,
+        investor_name
+   FROM tutorial.crunchbase_investments_part2 
+   WHERE company_name ILIKE 'm%'
+   
+   
+   
